@@ -119,10 +119,10 @@ button.ghost{flex:none;padding:11px 14px;}
           <circle cx="12" cy="12.5" r="3.2"/>
         </svg>
       </div>
-      <div class="primary">Choose the photo to fix</div>
-      <div class="secondary">A real photo of yours that lost its metadata</div>
+      <div class="primary">Take or choose a photo</div>
+      <div class="secondary">Camera on mobile · file picker on desktop</div>
     </div>
-    <input type="file" id="fileInput" accept="image/*">
+    <input type="file" id="fileInput" accept="image/*" capture="environment">
     <div class="note">This restores metadata on your own photos taken on your realme 9 Pro+ — the lens/camera fields are fixed to your phone's known profile, so you only need to fill in Name and Time per photo. Nothing is uploaded; everything runs in your browser. HEIC originals are re-saved as JPEG, since EXIF only survives reliably in JPEG.</div>
   </div>
 
