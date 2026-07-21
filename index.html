@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Evidence Metadata Editor</title>
+<title>Photo Metadata Fixer</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/piexifjs/1.0.6/piexif.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
@@ -17,10 +17,8 @@
   --muted:#8b95a1;
   --amber:#d9a441;
   --amber-dim:#8a6a2c;
-  --danger:#e5484d;
   --ok:#3fb950;
 }
-
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;}
 body{
@@ -30,9 +28,7 @@ body{
   min-height:100vh;
   padding:28px 16px 60px;
 }
-
 .wrap{max-width:640px;margin:0 auto;}
-
 .masthead{
   display:flex;
   align-items:baseline;
@@ -43,174 +39,75 @@ body{
 }
 .masthead h1{
   font-family:'Space Grotesk',sans-serif;
-  font-size:20px;
+  font-size:19px;
   font-weight:700;
   letter-spacing:0.02em;
   margin:0;
-  color:var(--text);
 }
 .masthead h1 span{color:var(--amber);}
-.masthead .tag{
-  font-size:10.5px;
-  color:var(--muted);
-  letter-spacing:0.08em;
-  text-transform:uppercase;
-}
+.masthead .tag{font-size:10.5px;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;}
 
-.panel{
-  background:var(--panel);
-  border:1px solid var(--border);
-  border-radius:4px;
-  padding:18px;
-  margin-bottom:16px;
-}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:18px;margin-bottom:16px;}
 
-.dropzone{
-  border:1.5px dashed var(--border);
-  border-radius:4px;
-  padding:36px 20px;
-  text-align:center;
-  cursor:pointer;
-  transition:border-color .15s ease, background .15s ease;
-  position:relative;
-}
+.dropzone{border:1.5px dashed var(--border);border-radius:4px;padding:36px 20px;text-align:center;cursor:pointer;transition:border-color .15s ease;}
 .dropzone:hover{border-color:var(--amber-dim);}
-.dropzone .icon{
-  width:38px;height:38px;margin:0 auto 12px;
-  border:1.5px solid var(--muted);
-  border-radius:50%;
-  display:flex;align-items:center;justify-content:center;
-  color:var(--muted);
-}
-.dropzone .primary{
-  font-family:'Space Grotesk',sans-serif;
-  font-weight:600;
-  font-size:15px;
-  color:var(--text);
-  margin-bottom:4px;
-}
+.dropzone .icon{width:38px;height:38px;margin:0 auto 12px;border:1.5px solid var(--muted);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--muted);}
+.dropzone .primary{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:15px;margin-bottom:4px;}
 .dropzone .secondary{font-size:11.5px;color:var(--muted);}
 #fileInput{display:none;}
 
 .stage{display:none;}
 .stage.active{display:block;}
 
-.preview-frame{
-  border:1px solid var(--border);
-  border-radius:4px;
-  overflow:hidden;
-  background:#000;
-  margin-bottom:14px;
-  line-height:0;
-  max-height:320px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-}
-.preview-frame img{width:100%;display:block;object-fit:contain;max-height:320px;}
+.preview-frame{border:1px solid var(--border);border-radius:4px;overflow:hidden;background:#000;margin-bottom:14px;max-height:300px;display:flex;align-items:center;justify-content:center;}
+.preview-frame img{width:100%;max-height:300px;object-fit:contain;display:block;}
 
-.meta-readout{
-  border:1px solid var(--border);
-  border-radius:3px;
-  background:var(--panel-2);
-  padding:10px 12px;
-  font-size:11px;
-  color:var(--muted);
-  line-height:1.6;
-  margin-bottom:16px;
+.section-label{
+  font-size:10px;letter-spacing:0.09em;text-transform:uppercase;color:var(--amber);
+  margin:18px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border);
 }
-.meta-readout strong{color:var(--text);font-weight:600;}
-.meta-readout .found{color:var(--amber);}
+.section-label:first-child{margin-top:0;}
 
-.badge-row{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  font-size:10px;
-  color:var(--muted);
-  letter-spacing:0.05em;
-  text-transform:uppercase;
-  margin-bottom:14px;
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;}
+.field-row.single{grid-template-columns:1fr;}
+.field{display:flex;flex-direction:column;gap:6px;}
+.field label{font-size:10px;letter-spacing:0.09em;text-transform:uppercase;color:var(--muted);}
+.field input{
+  background:var(--panel-2);border:1px solid var(--border);border-radius:3px;color:var(--text);
+  font-family:'IBM Plex Mono',monospace;font-size:12.5px;padding:9px 10px;outline:none;
 }
+.field input:focus{border-color:var(--amber-dim);}
+.field input.readout{color:var(--muted);background:transparent;border-style:dashed;}
+.field input.primary-input{border-color:var(--amber-dim);}
+
+.actions{display:flex;gap:10px;margin-top:6px;}
+button{
+  font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:13px;border-radius:3px;
+  padding:11px 16px;border:1px solid var(--border);background:var(--panel-2);color:var(--text);
+  cursor:pointer;transition:filter .15s ease;flex:1;
+}
+button:hover{filter:brightness(1.12);}
+button.primary{background:var(--amber);border-color:var(--amber);color:#1a1305;}
+button.ghost{flex:none;padding:11px 14px;}
+
+.note{font-size:10.5px;color:var(--muted);line-height:1.5;margin-top:12px;}
+
+.badge-row{display:flex;align-items:center;gap:8px;font-size:10px;color:var(--muted);letter-spacing:0.05em;text-transform:uppercase;margin-bottom:14px;}
 .dot{width:6px;height:6px;border-radius:50%;background:var(--amber);flex:none;}
 .dot.ok{background:var(--ok);}
 
-.field-row{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:12px;
-  margin-bottom:12px;
-}
-.field-row.single{grid-template-columns:1fr;}
-.field{
-  display:flex;
-  flex-direction:column;
-  gap:6px;
-}
-.field label{
-  font-size:10px;
-  letter-spacing:0.09em;
-  text-transform:uppercase;
-  color:var(--muted);
-}
-.field input{
-  background:var(--panel-2);
-  border:1px solid var(--border);
-  border-radius:3px;
-  color:var(--text);
-  font-family:'IBM Plex Mono',monospace;
-  font-size:12.5px;
-  padding:9px 10px;
-  outline:none;
-}
-.field input:focus{border-color:var(--amber-dim);}
-.field input::placeholder{color:#4d5762;}
-
-.actions{
-  display:flex;
-  gap:10px;
-  margin-top:6px;
-}
-button{
-  font-family:'Space Grotesk',sans-serif;
-  font-weight:600;
-  font-size:13px;
-  border-radius:3px;
-  padding:11px 16px;
-  border:1px solid var(--border);
-  background:var(--panel-2);
-  color:var(--text);
-  cursor:pointer;
-  transition:filter .15s ease;
-  flex:1;
-}
-button:hover{filter:brightness(1.12);}
-button.primary{
-  background:var(--amber);
-  border-color:var(--amber);
-  color:#1a1305;
-}
-button.ghost{flex:none;padding:11px 14px;}
-button:disabled{opacity:0.45;cursor:not-allowed;}
-
-.note{
-  font-size:10.5px;
-  color:var(--muted);
-  line-height:1.5;
-  margin-top:12px;
-}
-
 .result-panel{display:none;}
 .result-panel.active{display:block;}
-.result-panel .meta-readout strong{color:var(--ok);}
+.meta-readout{border:1px solid var(--border);border-radius:3px;background:var(--panel-2);padding:10px 12px;font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:16px;}
+.meta-readout strong{color:var(--text);font-weight:600;}
 </style>
 </head>
 <body>
 <div class="wrap">
 
   <div class="masthead">
-    <h1>EVIDENCE<span>·</span>METADATA</h1>
-    <div class="tag">EXIF Editor</div>
+    <h1>PHOTO<span>·</span>METADATA FIXER</h1>
+    <div class="tag">realme 9 Pro+</div>
   </div>
 
   <!-- STAGE 1: capture -->
@@ -222,58 +119,89 @@ button:disabled{opacity:0.45;cursor:not-allowed;}
           <circle cx="12" cy="12.5" r="3.2"/>
         </svg>
       </div>
-      <div class="primary">Take or choose a photo</div>
-      <div class="secondary">Camera on mobile · file picker on desktop</div>
+      <div class="primary">Choose the photo to fix</div>
+      <div class="secondary">A real photo of yours that lost its metadata</div>
     </div>
-    <input type="file" id="fileInput" accept="image/*" capture="environment">
-    <div class="note">This edits the file's actual EXIF metadata (the invisible data every image carries) — not a visible stamp on the picture. Nothing is uploaded; everything runs in your browser. Non-JPEG files are converted to JPEG first, since EXIF is a JPEG/TIFF standard.</div>
+    <input type="file" id="fileInput" accept="image/*">
+    <div class="note">This restores metadata on your own photos taken on your realme 9 Pro+ — the lens/camera fields are fixed to your phone's known profile, so you only need to fill in Name and Time per photo. Nothing is uploaded; everything runs in your browser. HEIC originals are re-saved as JPEG, since EXIF only survives reliably in JPEG.</div>
   </div>
 
-  <!-- STAGE 2: edit metadata -->
+  <!-- STAGE 2: edit -->
   <div class="panel stage" id="stage2">
-    <div class="badge-row"><div class="dot" id="statusDot"></div><span id="statusText">READING EXISTING METADATA…</span></div>
-
+    <div class="badge-row"><div class="dot" id="statusDot"></div><span id="statusText">LOADED</span></div>
     <div class="preview-frame"><img id="previewImg" alt="photo preview"></div>
 
-    <div class="meta-readout" id="existingMeta">—</div>
-
+    <div class="section-label">Per-photo (fill in for this photo)</div>
     <div class="field-row">
       <div class="field">
         <label for="fDate">Date</label>
-        <input type="date" id="fDate">
+        <input type="date" id="fDate" class="primary-input">
       </div>
       <div class="field">
         <label for="fTime">Time</label>
-        <input type="time" id="fTime" step="1">
+        <input type="time" id="fTime" step="1" class="primary-input">
+      </div>
+    </div>
+    <div class="field-row single">
+      <div class="field">
+        <label for="fName">Name</label>
+        <input type="text" id="fName" class="primary-input" placeholder="IMG20260721161411">
+      </div>
+    </div>
+
+    <div class="section-label">Device profile (fixed to your phone — edit only if needed)</div>
+    <div class="field-row">
+      <div class="field">
+        <label for="fDevice">Device</label>
+        <input type="text" id="fDevice">
+      </div>
+      <div class="field">
+        <label for="fFocal">Focal length</label>
+        <input type="text" id="fFocal">
       </div>
     </div>
     <div class="field-row">
       <div class="field">
-        <label for="fDevice">Device</label>
-        <input type="text" id="fDevice" placeholder="e.g. iPhone 14 Pro">
+        <label for="fAperture">Aperture</label>
+        <input type="text" id="fAperture">
       </div>
       <div class="field">
-        <label for="fRef">Reference ID</label>
-        <input type="text" id="fRef">
+        <label for="fISO">ISO</label>
+        <input type="text" id="fISO">
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="fExposure">Exposure time</label>
+        <input type="text" id="fExposure">
+      </div>
+      <div class="field">
+        <label for="fFlash">Flash</label>
+        <input type="text" id="fFlash">
       </div>
     </div>
     <div class="field-row single">
-      <div class="field" id="gpsField">
-        <label for="fLocation">Location (lat, lon)</label>
-        <input type="text" id="fLocation" placeholder="not set">
+      <div class="field">
+        <label for="fWB">White balance</label>
+        <input type="text" id="fWB">
       </div>
     </div>
-    <div class="field-row single">
+
+    <div class="section-label">Read directly from the file (not editable)</div>
+    <div class="field-row">
       <div class="field">
-        <label for="fNote">Note (optional)</label>
-        <input type="text" id="fNote" placeholder="e.g. finding reference, asset ID">
+        <label>Dimensions</label>
+        <input type="text" id="fDims" class="readout" readonly>
+      </div>
+      <div class="field">
+        <label>Path (for reference only — not written into the file)</label>
+        <input type="text" id="fPath" class="readout" readonly>
       </div>
     </div>
 
     <div class="actions">
       <button class="ghost" id="btnReset">New photo</button>
-      <button id="btnLocate">Add location</button>
-      <button class="primary" id="btnSave">Save with updated metadata</button>
+      <button class="primary" id="btnSave">Save with fixed metadata</button>
     </div>
   </div>
 
@@ -282,7 +210,7 @@ button:disabled{opacity:0.45;cursor:not-allowed;}
     <div class="badge-row"><div class="dot ok"></div>METADATA WRITTEN — READ BACK FROM SAVED FILE</div>
     <div class="meta-readout" id="resultMeta">—</div>
     <div class="actions">
-      <button class="ghost" id="btnAgain">Edit another photo</button>
+      <button class="ghost" id="btnAgain">Fix another photo</button>
       <button class="primary" id="btnDownload">Download file</button>
     </div>
   </div>
@@ -290,69 +218,87 @@ button:disabled{opacity:0.45;cursor:not-allowed;}
 </div>
 
 <script>
+const DEVICE_PROFILE = {
+  make: 'realme',
+  model: 'realme 9 Pro+',
+  focalDisplay: '24 mm (full-frame equivalent)',
+  focal35mm: 24,
+  apertureDisplay: 'f1.8',
+  apertureRational: [18,10],
+  isoDisplay: '640',
+  iso: 640,
+  exposureDisplay: '1/50 s',
+  exposureRational: [1,50],
+  flashDisplay: 'No flash',
+  flashCode: 0,
+  wbDisplay: 'Auto',
+  wbCode: 0
+};
+
 const dropzone = document.getElementById('dropzone');
 const fileInput = document.getElementById('fileInput');
 const stage1 = document.getElementById('stage1');
 const stage2 = document.getElementById('stage2');
 const stage3 = document.getElementById('stage3');
 const previewImg = document.getElementById('previewImg');
-const existingMeta = document.getElementById('existingMeta');
 const statusDot = document.getElementById('statusDot');
 const statusText = document.getElementById('statusText');
 const resultMeta = document.getElementById('resultMeta');
 
 const fDate = document.getElementById('fDate');
 const fTime = document.getElementById('fTime');
+const fName = document.getElementById('fName');
 const fDevice = document.getElementById('fDevice');
-const fRef = document.getElementById('fRef');
-const fLocation = document.getElementById('fLocation');
-const fNote = document.getElementById('fNote');
-const btnLocate = document.getElementById('btnLocate');
+const fFocal = document.getElementById('fFocal');
+const fAperture = document.getElementById('fAperture');
+const fISO = document.getElementById('fISO');
+const fExposure = document.getElementById('fExposure');
+const fFlash = document.getElementById('fFlash');
+const fWB = document.getElementById('fWB');
+const fDims = document.getElementById('fDims');
+const fPath = document.getElementById('fPath');
 const btnReset = document.getElementById('btnReset');
 const btnSave = document.getElementById('btnSave');
 const btnAgain = document.getElementById('btnAgain');
 const btnDownload = document.getElementById('btnDownload');
 
-let jpegDataUrl = null;   // working data URL, always image/jpeg
-let finalDataUrl = null;  // after metadata written, ready for download
+let jpegDataUrl = null;
+let finalDataUrl = null;
+let realWidth = 0, realHeight = 0;
+let nameManuallyEdited = false;
 
 function pad(n){ return n.toString().padStart(2,'0'); }
 function isoDate(d){ return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
 function isoTime(d){ return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; }
 
+function androidName(){
+  if(!fDate.value) return '';
+  const [y,m,day] = fDate.value.split('-');
+  const t = (fTime.value || '00:00:00').split(':');
+  return `IMG${y}${m}${day}${pad(t[0]||'00')}${pad(t[1]||'00')}${pad(t[2]||'00')}`;
+}
+
 function exifDateString(){
   if(!fDate.value) return null;
   const [y,m,day] = fDate.value.split('-');
-  const t = fTime.value || '00:00:00';
-  const parts = t.split(':');
-  return `${y}:${m}:${day} ${pad(parts[0]||'00')}:${pad(parts[1]||'00')}:${pad(parts[2]||'00')}`;
+  const t = (fTime.value || '00:00:00').split(':');
+  return `${y}:${m}:${day} ${pad(t[0]||'00')}:${pad(t[1]||'00')}:${pad(t[2]||'00')}`;
 }
 
 function displayDate(exifStr){
-  // exifStr like "2026:07:21 14:32:05" -> "21/07/2026 14:32:05"
   if(!exifStr) return null;
   const [datePart, timePart] = exifStr.split(' ');
   const [y,m,d] = datePart.split(':');
   return `${d}/${m}/${y} ${timePart || ''}`.trim();
 }
 
-function makeRef(){
-  const d = new Date();
-  const rand = Math.floor(1000 + Math.random()*9000);
-  return `EVID-${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}-${rand}`;
+function syncNameFromTime(){
+  if(!nameManuallyEdited) fName.value = androidName();
 }
 
-function detectDevice(){
-  const ua = navigator.userAgent;
-  let platform = 'Unknown platform';
-  if(/iPhone/.test(ua)) platform = 'iPhone';
-  else if(/iPad/.test(ua)) platform = 'iPad';
-  else if(/Android/.test(ua)) platform = 'Android device';
-  else if(/Macintosh/.test(ua)) platform = 'Mac';
-  else if(/Windows/.test(ua)) platform = 'Windows PC';
-  else if(/Linux/.test(ua)) platform = 'Linux';
-  return platform;
-}
+fDate.addEventListener('input', syncNameFromTime);
+fTime.addEventListener('input', syncNameFromTime);
+fName.addEventListener('input', () => { nameManuallyEdited = true; });
 
 dropzone.addEventListener('click', () => fileInput.click());
 fileInput.addEventListener('change', onFile);
@@ -360,16 +306,14 @@ fileInput.addEventListener('change', onFile);
 function onFile(e){
   const file = e.target.files[0];
   if(!file) return;
-
   const isJpeg = /jpe?g$/i.test(file.type) || /jpe?g$/i.test(file.name);
   const reader = new FileReader();
 
   reader.onload = () => {
     if(isJpeg){
       jpegDataUrl = reader.result;
-      afterLoad(file);
+      loadDims(jpegDataUrl, () => afterLoad(file));
     } else {
-      // convert to JPEG via canvas since EXIF is a JPEG/TIFF standard
       const img = new Image();
       img.onload = () => {
         const canvas = document.createElement('canvas');
@@ -377,6 +321,8 @@ function onFile(e){
         canvas.height = img.naturalHeight;
         canvas.getContext('2d').drawImage(img, 0, 0);
         jpegDataUrl = canvas.toDataURL('image/jpeg', 0.95);
+        realWidth = img.naturalWidth;
+        realHeight = img.naturalHeight;
         afterLoad(file);
       };
       img.src = reader.result;
@@ -385,96 +331,81 @@ function onFile(e){
   reader.readAsDataURL(file);
 }
 
+function loadDims(dataUrl, cb){
+  const img = new Image();
+  img.onload = () => { realWidth = img.naturalWidth; realHeight = img.naturalHeight; cb(); };
+  img.src = dataUrl;
+}
+
 function afterLoad(file){
+  nameManuallyEdited = false;
   stage1.classList.remove('active');
   stage2.classList.add('active');
   previewImg.src = jpegDataUrl;
-
-  let existing = null;
-  try{
-    existing = piexif.load(jpegDataUrl);
-  }catch(e){
-    existing = null;
-  }
-
-  let existingDT = null, existingModel = null, existingMake = null;
-  if(existing){
-    existingDT = existing['Exif'] && existing['Exif'][piexif.ExifIFD.DateTimeOriginal];
-    existingMake = existing['0th'] && existing['0th'][piexif.ImageIFD.Make];
-    existingModel = existing['0th'] && existing['0th'][piexif.ImageIFD.Model];
-  }
-
-  if(existingDT || existingModel || existingMake){
-    statusDot.classList.add('ok');
-    statusText.textContent = 'EXISTING EXIF METADATA FOUND';
-    existingMeta.innerHTML = `<span class="found">Currently embedded:</span><br>`
-      + (existingDT ? `Captured: <strong>${displayDate(existingDT)}</strong><br>` : '')
-      + ((existingMake||existingModel) ? `Device: <strong>${[existingMake,existingModel].filter(Boolean).join(' ')}</strong>` : '');
-  } else {
-    statusText.textContent = 'NO EXISTING METADATA FOUND IN THIS FILE';
-    existingMeta.textContent = 'This file has no readable EXIF data yet — the fields below will be written fresh.';
-  }
+  statusText.textContent = 'READY TO FIX';
 
   const capturedAt = file.lastModified ? new Date(file.lastModified) : new Date();
   fDate.value = isoDate(capturedAt);
   fTime.value = isoTime(capturedAt);
-  fDevice.value = existingModel || detectDevice();
-  fRef.value = makeRef();
-  fLocation.value = '';
-  fNote.value = '';
+  fName.value = androidName();
+
+  fDevice.value = DEVICE_PROFILE.model;
+  fFocal.value = DEVICE_PROFILE.focalDisplay;
+  fAperture.value = DEVICE_PROFILE.apertureDisplay;
+  fISO.value = DEVICE_PROFILE.isoDisplay;
+  fExposure.value = DEVICE_PROFILE.exposureDisplay;
+  fFlash.value = DEVICE_PROFILE.flashDisplay;
+  fWB.value = DEVICE_PROFILE.wbDisplay;
+
+  fDims.value = `${realWidth} × ${realHeight} Pixels`;
+  updatePath();
 }
 
-btnReset.addEventListener('click', () => resetToStage1());
-btnAgain.addEventListener('click', () => resetToStage1());
+function updatePath(){
+  fPath.value = `Phone/DCIM/Camera/${fName.value || androidName()}.jpg`;
+}
+fName.addEventListener('input', updatePath);
+fDate.addEventListener('input', updatePath);
+fTime.addEventListener('input', updatePath);
+
+btnReset.addEventListener('click', resetToStage1);
+btnAgain.addEventListener('click', resetToStage1);
 
 function resetToStage1(){
   jpegDataUrl = null;
   finalDataUrl = null;
   fileInput.value = '';
-  statusDot.classList.remove('ok');
   stage1.classList.add('active');
   stage2.classList.remove('active');
   stage3.classList.remove('active');
 }
 
-btnLocate.addEventListener('click', () => {
-  if(!navigator.geolocation){
-    fLocation.value = 'unavailable in this browser';
-    return;
-  }
-  btnLocate.textContent = 'Locating…';
-  btnLocate.disabled = true;
-  navigator.geolocation.getCurrentPosition(
-    (pos) => {
-      fLocation.value = `${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`;
-      btnLocate.textContent = 'Add location';
-      btnLocate.disabled = false;
-    },
-    () => {
-      fLocation.value = 'permission denied';
-      btnLocate.textContent = 'Add location';
-      btnLocate.disabled = false;
-    },
-    { timeout: 8000 }
-  );
-});
-
-function toDMSRational(deg){
-  const abs = Math.abs(deg);
-  const d = Math.floor(abs);
-  const minFloat = (abs - d) * 60;
-  const m = Math.floor(minFloat);
-  const secFloat = (minFloat - m) * 60;
-  const sec = Math.round(secFloat * 100);
-  return [[d,1],[m,1],[sec,100]];
+function parseAperture(v){
+  const m = /([\d.]+)/.exec(v || '');
+  if(!m) return DEVICE_PROFILE.apertureRational;
+  const f = parseFloat(m[1]);
+  return [Math.round(f*10), 10];
 }
-
-function parseLocation(){
-  const v = (fLocation.value || '').trim();
-  if(!v) return null;
-  const parts = v.split(',').map(s => parseFloat(s.trim()));
-  if(parts.length !== 2 || parts.some(isNaN)) return null;
-  return { lat: parts[0], lon: parts[1] };
+function parseExposure(v){
+  const m = /(\d+)\s*\/\s*(\d+)/.exec(v || '');
+  if(m) return [parseInt(m[1]), parseInt(m[2])];
+  const f = parseFloat(v);
+  if(!isNaN(f) && f > 0) return [1, Math.round(1/f)];
+  return DEVICE_PROFILE.exposureRational;
+}
+function parseFocal(v){
+  const m = /([\d.]+)/.exec(v || '');
+  return m ? Math.round(parseFloat(m[1])) : DEVICE_PROFILE.focal35mm;
+}
+function parseISO(v){
+  const n = parseInt(v);
+  return isNaN(n) ? DEVICE_PROFILE.iso : n;
+}
+function parseFlash(v){
+  return /no\s*flash/i.test(v || '') ? 0 : 1;
+}
+function parseWB(v){
+  return /manual/i.test(v || '') ? 1 : 0;
 }
 
 btnSave.addEventListener('click', () => {
@@ -483,32 +414,26 @@ btnSave.addEventListener('click', () => {
   const dt = exifDateString();
   const zeroth = {};
   const exifIFD = {};
-  const gps = {};
 
-  if(fDevice.value){
-    zeroth[piexif.ImageIFD.Model] = fDevice.value;
-  }
+  zeroth[piexif.ImageIFD.Make] = DEVICE_PROFILE.make;
+  zeroth[piexif.ImageIFD.Model] = fDevice.value || DEVICE_PROFILE.model;
+
   if(dt){
     zeroth[piexif.ImageIFD.DateTime] = dt;
     exifIFD[piexif.ExifIFD.DateTimeOriginal] = dt;
     exifIFD[piexif.ExifIFD.DateTimeDigitized] = dt;
   }
 
-  const descParts = [];
-  if(fRef.value) descParts.push(`Ref:${fRef.value}`);
-  if(fNote.value) descParts.push(fNote.value);
-  if(descParts.length) zeroth[piexif.ImageIFD.ImageDescription] = descParts.join(' | ');
-
-  const loc = parseLocation();
-  if(loc){
-    gps[piexif.GPSIFD.GPSLatitudeRef] = loc.lat >= 0 ? 'N' : 'S';
-    gps[piexif.GPSIFD.GPSLatitude] = toDMSRational(loc.lat);
-    gps[piexif.GPSIFD.GPSLongitudeRef] = loc.lon >= 0 ? 'E' : 'W';
-    gps[piexif.GPSIFD.GPSLongitude] = toDMSRational(loc.lon);
-  }
+  exifIFD[piexif.ExifIFD.FNumber] = parseAperture(fAperture.value);
+  exifIFD[piexif.ExifIFD.FocalLengthIn35mmFilm] = parseFocal(fFocal.value);
+  exifIFD[piexif.ExifIFD.ISOSpeedRatings] = parseISO(fISO.value);
+  exifIFD[piexif.ExifIFD.ExposureTime] = parseExposure(fExposure.value);
+  exifIFD[piexif.ExifIFD.Flash] = parseFlash(fFlash.value);
+  exifIFD[piexif.ExifIFD.WhiteBalance] = parseWB(fWB.value);
+  exifIFD[piexif.ExifIFD.PixelXDimension] = realWidth;
+  exifIFD[piexif.ExifIFD.PixelYDimension] = realHeight;
 
   const exifObj = { '0th': zeroth, 'Exif': exifIFD };
-  if(Object.keys(gps).length) exifObj['GPS'] = gps;
 
   let exifBytes;
   try{
@@ -519,21 +444,18 @@ btnSave.addEventListener('click', () => {
     return;
   }
 
-  // read back to confirm what actually got written
   const verify = piexif.load(finalDataUrl);
-  const vDT = verify['Exif'][piexif.ExifIFD.DateTimeOriginal];
-  const vModel = verify['0th'][piexif.ImageIFD.Model];
-  const vDesc = verify['0th'][piexif.ImageIFD.ImageDescription];
-  let vGPS = '';
-  if(verify['GPS'] && verify['GPS'][piexif.GPSIFD.GPSLatitude]){
-    vGPS = `<br>Location: <strong>${fLocation.value}</strong>`;
-  }
-
   resultMeta.innerHTML =
-    (vDT ? `Captured: <strong>${displayDate(vDT)}</strong><br>` : '') +
-    (vModel ? `Device: <strong>${vModel}</strong><br>` : '') +
-    (vDesc ? `Description: <strong>${vDesc}</strong>` : '') +
-    vGPS;
+    `Name: <strong>${fName.value}</strong><br>` +
+    `Time: <strong>${displayDate(verify['Exif'][piexif.ExifIFD.DateTimeOriginal])}</strong><br>` +
+    `Device: <strong>${verify['0th'][piexif.ImageIFD.Model]}</strong><br>` +
+    `Dimensions: <strong>${realWidth} × ${realHeight} Pixels</strong><br>` +
+    `Focal length: <strong>${fFocal.value}</strong><br>` +
+    `Aperture: <strong>${fAperture.value}</strong><br>` +
+    `ISO: <strong>${fISO.value}</strong><br>` +
+    `Exposure time: <strong>${fExposure.value}</strong><br>` +
+    `Flash: <strong>${fFlash.value}</strong><br>` +
+    `White balance: <strong>${fWB.value}</strong>`;
 
   stage2.classList.remove('active');
   stage3.classList.add('active');
@@ -542,8 +464,7 @@ btnSave.addEventListener('click', () => {
 btnDownload.addEventListener('click', () => {
   if(!finalDataUrl) return;
   const link = document.createElement('a');
-  const refPart = (fRef.value || 'evidence').replace(/\s+/g,'_');
-  link.download = `${refPart}.jpg`;
+  link.download = `${fName.value || 'IMG'}.jpg`;
   link.href = finalDataUrl;
   link.click();
 });
