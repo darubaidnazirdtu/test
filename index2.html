@@ -244,51 +244,58 @@ function formatStampDate(d){
   return `${weekday}, ${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()} ${hh}:${pad(d.getMinutes())} ${ampm} ${formatOffset(d)}`;
 }
 
-function drawPinDecoration(x, y, size){
-  // generic stylized location-pin graphic (not a real map tile)
-  const r = size/2;
+function drawMapPlaceholder(x, y, size){
+  // generic stylized location marker graphic (not a real map tile, not a logo)
   ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(x, y);
-  ctx.arc(x, y, r, 0, Math.PI*2);
+  roundRect(ctx, x, y, size, size, size*0.09);
   ctx.clip();
 
-  const grad = ctx.createLinearGradient(x-r, y-r, x+r, y+r);
-  grad.addColorStop(0, '#33422e');
+  const grad = ctx.createLinearGradient(x, y, x+size, y+size);
+  grad.addColorStop(0, '#3a4a33');
   grad.addColorStop(1, '#1d2a1a');
   ctx.fillStyle = grad;
-  ctx.fillRect(x-r, y-r, size, size);
+  ctx.fillRect(x, y, size, size);
 
-  ctx.strokeStyle = 'rgba(217,164,65,0.25)';
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)';
   ctx.lineWidth = Math.max(1, size*0.012);
   for(let i=0;i<4;i++){
     ctx.beginPath();
-    ctx.moveTo(x-r, y-r + (i+0.5)*size/4 + (i%2? size*0.08 : -size*0.05));
-    ctx.bezierCurveTo(x-r*0.3, y-r+(i)*size/4, x+r*0.3, y-r+(i+1)*size/4, x+r, y-r+(i+0.7)*size/4);
+    ctx.moveTo(x, y + (i+0.5)*size/4 + (i%2? size*0.08 : -size*0.05));
+    ctx.bezierCurveTo(x+size*0.3, y+(i)*size/4, x+size*0.7, y+(i+1)*size/4, x+size, y+(i+0.7)*size/4);
     ctx.stroke();
   }
   ctx.restore();
 
-  // pin icon
+  // pin icon, centered
+  const cx = x + size/2, cy = y + size/2;
   const pinH = size*0.42;
   ctx.beginPath();
-  ctx.arc(x, y - pinH*0.18, pinH*0.32, 0, Math.PI*2);
-  ctx.moveTo(x - pinH*0.32, y - pinH*0.05);
-  ctx.quadraticCurveTo(x, y + pinH*0.55, x, y + pinH*0.55);
-  ctx.quadraticCurveTo(x, y + pinH*0.55, x + pinH*0.32, y - pinH*0.05);
+  ctx.arc(cx, cy - pinH*0.18, pinH*0.32, 0, Math.PI*2);
+  ctx.moveTo(cx - pinH*0.32, cy - pinH*0.05);
+  ctx.quadraticCurveTo(cx, cy + pinH*0.55, cx, cy + pinH*0.55);
+  ctx.quadraticCurveTo(cx, cy + pinH*0.55, cx + pinH*0.32, cy - pinH*0.05);
   ctx.closePath();
-  ctx.fillStyle = '#d9484d';
+  ctx.fillStyle = '#e5484d';
   ctx.fill();
   ctx.beginPath();
-  ctx.arc(x, y - pinH*0.18, pinH*0.13, 0, Math.PI*2);
+  ctx.arc(cx, cy - pinH*0.18, pinH*0.13, 0, Math.PI*2);
   ctx.fillStyle = '#1a1305';
   ctx.fill();
 
-  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+  ctx.strokeStyle = 'rgba(255,255,255,0.18)';
   ctx.lineWidth = Math.max(1, size*0.015);
-  ctx.beginPath();
-  ctx.arc(x, y, r - ctx.lineWidth/2, 0, Math.PI*2);
+  roundRect(ctx, x + ctx.lineWidth/2, y + ctx.lineWidth/2, size - ctx.lineWidth, size - ctx.lineWidth, size*0.09);
   ctx.stroke();
+}
+
+function roundRect(c, x, y, w_, h_, r){
+  c.beginPath();
+  c.moveTo(x+r, y);
+  c.arcTo(x+w_, y, x+w_, y+h_, r);
+  c.arcTo(x+w_, y+h_, x, y+h_, r);
+  c.arcTo(x, y+h_, x, y, r);
+  c.arcTo(x, y, x+w_, y, r);
+  c.closePath();
 }
 
 function addressLines(){
@@ -304,6 +311,8 @@ function addressLines(){
   return { primary, secondary };
 }
 
+const STAMP_FONT = "'Space Grotesk', sans-serif";
+
 function draw(){
   if(!sourceImage) return;
   const w = sourceImage.naturalWidth, h = sourceImage.naturalHeight;
@@ -313,66 +322,55 @@ function draw(){
   const { primary, secondary } = addressLines();
   const caption = fCaption.value;
 
-  let lineCount = 1; // time line always present
-  if(primary) lineCount++;
-  if(secondary) lineCount++;
-  if(coords) lineCount++; // lat/long line
-  if(caption) lineCount++;
+  const lines = [];
+  if(primary) lines.push({ text: primary, weight: 700, size: 'primary' });
+  if(secondary) lines.push({ text: secondary, weight: 400, size: 'normal' });
+  if(coords) lines.push({ text: `Lat ${coords.lat.toFixed(5)}°  Long ${coords.lon.toFixed(5)}°`, weight: 500, size: 'normal' });
+  lines.push({ text: formatStampDate(captureTime), weight: 500, size: 'normal' });
+  if(caption) lines.push({ text: caption, weight: 500, size: 'normal' });
 
-  const bandH = Math.round(h * (0.07 + lineCount*0.032));
-  const bandY = h - bandH;
-  const grad = ctx.createLinearGradient(0, bandY - 30, 0, h);
-  grad.addColorStop(0, 'rgba(8,10,13,0)');
-  grad.addColorStop(1, 'rgba(6,8,10,0.88)');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, bandY - 30, w, bandH + 30);
+  const primaryFont = Math.max(16, Math.round(w*0.034));
+  const normalFont = Math.max(12, Math.round(w*0.021));
+  const lineGap = normalFont * 1.5;
+  const innerPad = Math.max(12, w*0.018);
 
-  const pad_ = Math.max(14, w*0.022);
-  const pinSize = Math.min(bandH*0.82, w*0.16);
-  const pinX = pad_ + pinSize/2;
-  const pinY = h - bandH/2 - bandH*0.02;
-  drawPinDecoration(pinX, pinY, pinSize);
+  // total text block height
+  let textH = 0;
+  lines.forEach(l => { textH += (l.size === 'primary' ? primaryFont*1.25 : lineGap); });
+  const cardH = Math.max(textH + innerPad*1.6, w*0.13);
 
-  const textX = pad_*2 + pinSize;
-  let cursorY = h - bandH + bandH*0.18;
-  const primaryFont = Math.max(15, Math.round(w*0.026));
-  const smallFont = Math.max(11, Math.round(w*0.0145));
-  const lineGap = smallFont * 1.55;
+  const marginBottom = h*0.035;
+  const marginSide = w*0.035;
+  const squareSize = cardH;
+  const squareX = marginSide;
+  const squareY = h - marginBottom - squareSize;
+  drawMapPlaceholder(squareX, squareY, squareSize);
+
+  const cardX = squareX + squareSize + w*0.02;
+  const cardW = w - cardX - marginSide;
+  const cardY = squareY;
+
+  ctx.fillStyle = 'rgba(10,14,20,0.82)';
+  roundRect(ctx, cardX, cardY, cardW, cardH, squareSize*0.09);
+  ctx.fill();
+
+  const textX = cardX + innerPad;
+  const maxTextW = cardW - innerPad*2;
+  let cursorY = cardY + (cardH - textH)/2;
 
   ctx.textBaseline = 'top';
+  ctx.fillStyle = '#ffffff';
 
-  if(primary){
-    ctx.fillStyle = '#f2f5f8';
-    ctx.font = `700 ${primaryFont}px 'IBM Plex Mono', monospace`;
-    ctx.fillText(primary, textX, cursorY);
-    cursorY += primaryFont * 1.25;
-  }
-  if(secondary){
-    ctx.fillStyle = '#c3ccd6';
-    ctx.font = `400 ${smallFont}px 'IBM Plex Mono', monospace`;
-    ctx.fillText(truncateToWidth(secondary, w - textX - pad_, smallFont), textX, cursorY);
-    cursorY += lineGap;
-  }
-  if(coords){
-    ctx.fillStyle = '#9aa4af';
-    ctx.font = `500 ${smallFont}px 'IBM Plex Mono', monospace`;
-    ctx.fillText(`Lat ${coords.lat.toFixed(5)}°  Long ${coords.lon.toFixed(5)}°`, textX, cursorY);
-    cursorY += lineGap;
-  }
-  ctx.fillStyle = '#e6edf3';
-  ctx.font = `600 ${smallFont}px 'IBM Plex Mono', monospace`;
-  ctx.fillText(formatStampDate(captureTime), textX, cursorY);
-  cursorY += lineGap;
-
-  if(caption){
-    ctx.fillStyle = '#d9a441';
-    ctx.font = `500 ${smallFont}px 'IBM Plex Mono', monospace`;
-    ctx.fillText(caption, textX, cursorY);
-  }
+  lines.forEach(l => {
+    const fs = l.size === 'primary' ? primaryFont : normalFont;
+    ctx.font = `${l.weight} ${fs}px ${STAMP_FONT}`;
+    ctx.fillText(truncateToWidth(l.text, maxTextW, fs, l.weight), textX, cursorY);
+    cursorY += (l.size === 'primary' ? fs*1.25 : lineGap);
+  });
 }
 
-function truncateToWidth(str, maxWidth, fontSize){
-  ctx.font = `400 ${fontSize}px 'IBM Plex Mono', monospace`;
+function truncateToWidth(str, maxWidth, fontSize, weight){
+  ctx.font = `${weight} ${fontSize}px ${STAMP_FONT}`;
   if(ctx.measureText(str).width <= maxWidth) return str;
   let s = str;
   while(s.length > 3 && ctx.measureText(s + '…').width > maxWidth){
