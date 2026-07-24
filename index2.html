@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Location Stamp Camera</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+:root{
+  --bg:#0d1117;
+  --panel:#12171f;
+  --panel-2:#161c26;
+  --border:#262f3a;
+  --text:#e6edf3;
+  --muted:#8b95a1;
+  --amber:#d9a441;
+  --amber-dim:#8a6a2c;
+  --ok:#3fb950;
+  --danger:#e5484d;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:'IBM Plex Mono',monospace;
+  min-height:100vh;
+  padding:28px 16px 60px;
+}
+.wrap{max-width:640px;margin:0 auto;}
+.masthead{display:flex;align-items:baseline;justify-content:space-between;border-bottom:1px solid var(--border);padding-bottom:14px;margin-bottom:22px;}
+.masthead h1{font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:700;letter-spacing:0.02em;margin:0;}
+.masthead h1 span{color:var(--amber);}
+.masthead .tag{font-size:10.5px;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;}
+
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:18px;margin-bottom:16px;}
+
+.dropzone{border:1.5px dashed var(--border);border-radius:4px;padding:36px 20px;text-align:center;cursor:pointer;transition:border-color .15s ease;}
+.dropzone:hover{border-color:var(--amber-dim);}
+.dropzone .icon{width:38px;height:38px;margin:0 auto 12px;border:1.5px solid var(--muted);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--muted);}
+.dropzone .primary{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:15px;margin-bottom:4px;}
+.dropzone .secondary{font-size:11.5px;color:var(--muted);}
+#fileInput{display:none;}
+
+.stage{display:none;}
+.stage.active{display:block;}
+
+.status-line{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted);margin-bottom:14px;}
+.status-line .dot{width:6px;height:6px;border-radius:50%;background:var(--amber);flex:none;animation:pulse 1.4s ease-in-out infinite;}
+.status-line .dot.ok{background:var(--ok);animation:none;}
+.status-line .dot.err{background:var(--danger);animation:none;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.3;}}
+
+.preview-frame{border:1px solid var(--border);border-radius:4px;overflow:hidden;background:#000;margin-bottom:14px;line-height:0;}
+#stampCanvas{width:100%;display:block;}
+
+.field-row.single{margin-bottom:12px;}
+.field{display:flex;flex-direction:column;gap:6px;}
+.field label{font-size:10px;letter-spacing:0.09em;text-transform:uppercase;color:var(--muted);}
+.field input{
+  background:var(--panel-2);border:1px solid var(--border);border-radius:3px;color:var(--text);
+  font-family:'IBM Plex Mono',monospace;font-size:12.5px;padding:9px 10px;outline:none;
+}
+.field input:focus{border-color:var(--amber-dim);}
+.field input::placeholder{color:#4d5762;}
+
+.actions{display:flex;gap:10px;margin-top:6px;}
+button{
+  font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:13px;border-radius:3px;
+  padding:11px 16px;border:1px solid var(--border);background:var(--panel-2);color:var(--text);
+  cursor:pointer;transition:filter .15s ease;flex:1;
+}
+button:hover{filter:brightness(1.12);}
+button.primary{background:var(--amber);border-color:var(--amber);color:#1a1305;}
+button.ghost{flex:none;padding:11px 14px;}
+button:disabled{opacity:0.45;cursor:not-allowed;}
+
+.note{font-size:10.5px;color:var(--muted);line-height:1.5;margin-top:12px;}
+.note.warn{color:var(--danger);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="masthead">
+    <h1>LOCATION<span>·</span>STAMP</h1>
+    <div class="tag">Live capture only</div>
+  </div>
+
+  <!-- STAGE 1: capture -->
+  <div class="panel stage active" id="stage1">
+    <div class="dropzone" id="dropzone">
+      <div class="icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <path d="M4 8a2 2 0 0 1 2-2h1.5l1-1.5h7l1 1.5H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8z"/>
+          <circle cx="12" cy="12.5" r="3.2"/>
+        </svg>
+      </div>
+      <div class="primary">Take a photo</div>
+      <div class="secondary">Opens your camera · location + time are read live</div>
+    </div>
+    <input type="file" id="fileInput" accept="image/*" capture="environment">
+    <div class="note">Location and time are captured live from your device at the moment you take the photo — they are not editable, so the stamp reflects where and when the photo was actually taken. Everything happens in your browser; the photo itself is never uploaded. A location lookup (reverse geocoding) is sent to a public address-lookup service to turn coordinates into a readable address — only the coordinates leave your device, not the image.</div>
+  </div>
+
+  <!-- STAGE 2: processing / result -->
+  <div class="panel stage" id="stage2">
+    <div class="status-line"><div class="dot" id="statusDot"></div><span id="statusText">Reading photo…</span></div>
+    <div class="preview-frame"><canvas id="stampCanvas"></canvas></div>
+
+    <div class="field-row single">
+      <div class="field">
+        <label for="fCaption">Caption (optional)</label>
+        <input type="text" id="fCaption" placeholder="e.g. site visit, asset reference">
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="ghost" id="btnReset">New photo</button>
+      <button class="primary" id="btnDownload" disabled>Download stamped photo</button>
+    </div>
+    <div class="note" id="permNote" style="display:none;"></div>
+  </div>
+
+</div>
+
+<script>
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('fileInput');
+const stage1 = document.getElementById('stage1');
+const stage2 = document.getElementById('stage2');
+const statusDot = document.getElementById('statusDot');
+const statusText = document.getElementById('statusText');
+const canvas = document.getElementById('stampCanvas');
+const ctx = canvas.getContext('2d');
+const fCaption = document.getElementById('fCaption');
+const btnReset = document.getElementById('btnReset');
+const btnDownload = document.getElementById('btnDownload');
+const permNote = document.getElementById('permNote');
+
+let sourceImage = null;
+let captureTime = null;
+let coords = null;       // {lat, lon}
+let geoData = null;      // reverse-geocode result
+let geoFailed = false;
+
+function pad(n){ return n.toString().padStart(2,'0'); }
+
+function setStatus(text, state){
+  statusText.textContent = text;
+  statusDot.className = 'dot' + (state ? ' ' + state : '');
+}
+
+dropzone.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', onFile);
+fCaption.addEventListener('input', draw);
+btnReset.addEventListener('click', resetToStage1);
+
+function resetToStage1(){
+  sourceImage = null; coords = null; geoData = null; geoFailed = false;
+  fileInput.value = '';
+  fCaption.value = '';
+  btnDownload.disabled = true;
+  permNote.style.display = 'none';
+  stage1.classList.add('active');
+  stage2.classList.remove('active');
+}
+
+function onFile(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  captureTime = new Date();
+
+  const img = new Image();
+  img.onload = () => {
+    sourceImage = img;
+    stage1.classList.remove('active');
+    stage2.classList.add('active');
+    setStatus('Getting your location…');
+    draw();
+    getLocation();
+  };
+  img.src = URL.createObjectURL(file);
+}
+
+function getLocation(){
+  if(!navigator.geolocation){
+    geoFailed = true;
+    setStatus('Location unavailable in this browser', 'err');
+    permNote.style.display = 'block';
+    permNote.textContent = 'This browser has no location support — the photo will only be time-stamped.';
+    finish();
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(
+    async (pos) => {
+      coords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+      setStatus('Looking up address…');
+      try{
+        const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${coords.lat}&lon=${coords.lon}&zoom=16&addressdetails=1`;
+        const res = await fetch(url, { headers: { 'Accept-Language': 'en' } });
+        if(res.ok) geoData = await res.json();
+      }catch(err){
+        // address lookup failed — coordinates still shown
+      }
+      finish();
+    },
+    () => {
+      geoFailed = true;
+      setStatus('Location permission denied', 'err');
+      permNote.style.display = 'block';
+      permNote.textContent = 'Location access was denied — the photo will only be time-stamped, not geotagged. Allow location access and retake if you need the address.';
+      finish();
+    },
+    { enableHighAccuracy: true, timeout: 10000 }
+  );
+}
+
+function finish(){
+  setStatus(coords ? 'Stamped with live location + time' : 'Stamped with time only', 'ok');
+  draw();
+  btnDownload.disabled = false;
+}
+
+function countryFlag(cc){
+  if(!cc || cc.length !== 2) return '';
+  const points = [...cc.toUpperCase()].map(c => 127397 + c.charCodeAt(0));
+  return String.fromCodePoint(...points);
+}
+
+function formatOffset(d){
+  const offMin = -d.getTimezoneOffset();
+  const sign = offMin >= 0 ? '+' : '-';
+  const abs = Math.abs(offMin);
+  return `GMT ${sign}${pad(Math.floor(abs/60))}:${pad(abs%60)}`;
+}
+
+function formatStampDate(d){
+  const weekday = d.toLocaleDateString('en-US', { weekday: 'long' });
+  let hh = d.getHours();
+  const ampm = hh >= 12 ? 'PM' : 'AM';
+  hh = hh % 12; if(hh === 0) hh = 12;
+  return `${weekday}, ${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()} ${hh}:${pad(d.getMinutes())} ${ampm} ${formatOffset(d)}`;
+}
+
+function drawPinDecoration(x, y, size){
+  // generic stylized location-pin graphic (not a real map tile)
+  const r = size/2;
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.arc(x, y, r, 0, Math.PI*2);
+  ctx.clip();
+
+  const grad = ctx.createLinearGradient(x-r, y-r, x+r, y+r);
+  grad.addColorStop(0, '#33422e');
+  grad.addColorStop(1, '#1d2a1a');
+  ctx.fillStyle = grad;
+  ctx.fillRect(x-r, y-r, size, size);
+
+  ctx.strokeStyle = 'rgba(217,164,65,0.25)';
+  ctx.lineWidth = Math.max(1, size*0.012);
+  for(let i=0;i<4;i++){
+    ctx.beginPath();
+    ctx.moveTo(x-r, y-r + (i+0.5)*size/4 + (i%2? size*0.08 : -size*0.05));
+    ctx.bezierCurveTo(x-r*0.3, y-r+(i)*size/4, x+r*0.3, y-r+(i+1)*size/4, x+r, y-r+(i+0.7)*size/4);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // pin icon
+  const pinH = size*0.42;
+  ctx.beginPath();
+  ctx.arc(x, y - pinH*0.18, pinH*0.32, 0, Math.PI*2);
+  ctx.moveTo(x - pinH*0.32, y - pinH*0.05);
+  ctx.quadraticCurveTo(x, y + pinH*0.55, x, y + pinH*0.55);
+  ctx.quadraticCurveTo(x, y + pinH*0.55, x + pinH*0.32, y - pinH*0.05);
+  ctx.closePath();
+  ctx.fillStyle = '#d9484d';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(x, y - pinH*0.18, pinH*0.13, 0, Math.PI*2);
+  ctx.fillStyle = '#1a1305';
+  ctx.fill();
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+  ctx.lineWidth = Math.max(1, size*0.015);
+  ctx.beginPath();
+  ctx.arc(x, y, r - ctx.lineWidth/2, 0, Math.PI*2);
+  ctx.stroke();
+}
+
+function addressLines(){
+  if(geoFailed || !coords) return { primary: null, secondary: null };
+  if(!geoData || !geoData.address) return { primary: null, secondary: null };
+  const a = geoData.address;
+  const city = a.city || a.town || a.village || a.county || a.suburb || '';
+  const state = a.state || '';
+  const country = a.country || '';
+  const flag = countryFlag(a.country_code);
+  const primary = [city, state, country].filter(Boolean).join(', ') + (flag ? ' ' + flag : '');
+  const secondary = geoData.display_name || '';
+  return { primary, secondary };
+}
+
+function draw(){
+  if(!sourceImage) return;
+  const w = sourceImage.naturalWidth, h = sourceImage.naturalHeight;
+  canvas.width = w; canvas.height = h;
+  ctx.drawImage(sourceImage, 0, 0, w, h);
+
+  const { primary, secondary } = addressLines();
+  const caption = fCaption.value;
+
+  let lineCount = 1; // time line always present
+  if(primary) lineCount++;
+  if(secondary) lineCount++;
+  if(coords) lineCount++; // lat/long line
+  if(caption) lineCount++;
+
+  const bandH = Math.round(h * (0.07 + lineCount*0.032));
+  const bandY = h - bandH;
+  const grad = ctx.createLinearGradient(0, bandY - 30, 0, h);
+  grad.addColorStop(0, 'rgba(8,10,13,0)');
+  grad.addColorStop(1, 'rgba(6,8,10,0.88)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, bandY - 30, w, bandH + 30);
+
+  const pad_ = Math.max(14, w*0.022);
+  const pinSize = Math.min(bandH*0.82, w*0.16);
+  const pinX = pad_ + pinSize/2;
+  const pinY = h - bandH/2 - bandH*0.02;
+  drawPinDecoration(pinX, pinY, pinSize);
+
+  const textX = pad_*2 + pinSize;
+  let cursorY = h - bandH + bandH*0.18;
+  const primaryFont = Math.max(15, Math.round(w*0.026));
+  const smallFont = Math.max(11, Math.round(w*0.0145));
+  const lineGap = smallFont * 1.55;
+
+  ctx.textBaseline = 'top';
+
+  if(primary){
+    ctx.fillStyle = '#f2f5f8';
+    ctx.font = `700 ${primaryFont}px 'IBM Plex Mono', monospace`;
+    ctx.fillText(primary, textX, cursorY);
+    cursorY += primaryFont * 1.25;
+  }
+  if(secondary){
+    ctx.fillStyle = '#c3ccd6';
+    ctx.font = `400 ${smallFont}px 'IBM Plex Mono', monospace`;
+    ctx.fillText(truncateToWidth(secondary, w - textX - pad_, smallFont), textX, cursorY);
+    cursorY += lineGap;
+  }
+  if(coords){
+    ctx.fillStyle = '#9aa4af';
+    ctx.font = `500 ${smallFont}px 'IBM Plex Mono', monospace`;
+    ctx.fillText(`Lat ${coords.lat.toFixed(5)}°  Long ${coords.lon.toFixed(5)}°`, textX, cursorY);
+    cursorY += lineGap;
+  }
+  ctx.fillStyle = '#e6edf3';
+  ctx.font = `600 ${smallFont}px 'IBM Plex Mono', monospace`;
+  ctx.fillText(formatStampDate(captureTime), textX, cursorY);
+  cursorY += lineGap;
+
+  if(caption){
+    ctx.fillStyle = '#d9a441';
+    ctx.font = `500 ${smallFont}px 'IBM Plex Mono', monospace`;
+    ctx.fillText(caption, textX, cursorY);
+  }
+}
+
+function truncateToWidth(str, maxWidth, fontSize){
+  ctx.font = `400 ${fontSize}px 'IBM Plex Mono', monospace`;
+  if(ctx.measureText(str).width <= maxWidth) return str;
+  let s = str;
+  while(s.length > 3 && ctx.measureText(s + '…').width > maxWidth){
+    s = s.slice(0, -1);
+  }
+  return s + '…';
+}
+
+btnDownload.addEventListener('click', () => {
+  draw();
+  const link = document.createElement('a');
+  const d = captureTime;
+  link.download = `IMG${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}.jpg`;
+  link.href = canvas.toDataURL('image/jpeg', 0.92);
+  link.click();
+});
+</script>
+</body>
+</html>
