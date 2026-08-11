@@ -545,9 +545,23 @@ btnSave.addEventListener('click', () => {
   exifIFD[piexif.ExifIFD.PixelXDimension] = realWidth;
   exifIFD[piexif.ExifIFD.PixelYDimension] = realHeight;
 
-  // Store the user-entered Subject in the image EXIF metadata.
-  // ImageDescription is the standard EXIF field used here for the subject/description value.
-  zeroth[piexif.ImageIFD.ImageDescription] = fSubject.value.trim();
+  // Store Subject in multiple EXIF-compatible fields so metadata viewers
+  // (including Windows File Explorer) can detect/display it.
+  const subject = fSubject.value.trim();
+
+  // Standard EXIF ImageDescription.
+  zeroth[piexif.ImageIFD.ImageDescription] = subject;
+
+  // Windows-compatible EXIF XPSubject (UTF-16LE, null terminated).
+  // This is the field commonly exposed as "Subject" in Windows image properties.
+  if (piexif.ImageIFD.XPSubject !== undefined) {
+    const xpBytes = [];
+    for (let i = 0; i < (subject + '\\0').length; i++) {
+      const code = (subject + '\\0').charCodeAt(i);
+      xpBytes.push(code & 0xff, (code >> 8) & 0xff);
+    }
+    zeroth[piexif.ImageIFD.XPSubject] = xpBytes;
+  }
 
   const exifObj = { '0th': zeroth, 'Exif': exifIFD };
 
@@ -574,7 +588,17 @@ btnSave.addEventListener('click', () => {
     gpsLine = `Location: <strong>${latDec.toFixed(6)}, ${lonDec.toFixed(6)}</strong><br>`;
   }
 
-  const savedSubject = verify['0th'][piexif.ImageIFD.ImageDescription] || '';
+  let savedSubject = verify['0th'][piexif.ImageIFD.ImageDescription] || '';
+  if (verify['0th'][piexif.ImageIFD.XPSubject]) {
+    const bytes = verify['0th'][piexif.ImageIFD.XPSubject];
+    let decoded = '';
+    for (let i = 0; i + 1 < bytes.length; i += 2) {
+      const code = bytes[i] | (bytes[i + 1] << 8);
+      if (code === 0) break;
+      decoded += String.fromCharCode(code);
+    }
+    if (decoded) savedSubject = decoded;
+  }
 
   resultMeta.innerHTML =
     `Name: <strong>${fName.value}</strong><br>` +
