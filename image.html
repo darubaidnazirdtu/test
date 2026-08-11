@@ -538,11 +538,17 @@ btnSave.addEventListener('click', () => {
   exifIFD[piexif.ExifIFD.Flash] = parseFlash(fFlash.value);
   exifIFD[piexif.ExifIFD.WhiteBalance] = parseWB(fWB.value);
   const subjectValue = fSubject.value.trim() || 'Imaging';
+  // Standard EXIF description.
   zeroth[piexif.ImageIFD.ImageDescription] = subjectValue;
-  // Windows Explorer commonly reads XPSubject for the Subject property.
-  zeroth[piexif.ImageIFD.XPSubject] = Array.from(subjectValue)
-    .map(c => c.charCodeAt(0))
-    .concat([0]);
+
+  // Windows Explorer Subject property: UTF-16LE bytes + null terminator.
+  const xpSubjectBytes = [];
+  for (const ch of subjectValue) {
+    const code = ch.charCodeAt(0);
+    xpSubjectBytes.push(code & 0xff, (code >> 8) & 0xff);
+  }
+  xpSubjectBytes.push(0, 0);
+  zeroth[piexif.ImageIFD.XPSubject] = xpSubjectBytes;
   exifIFD[piexif.ExifIFD.PixelXDimension] = realWidth;
   exifIFD[piexif.ExifIFD.PixelYDimension] = realHeight;
 
