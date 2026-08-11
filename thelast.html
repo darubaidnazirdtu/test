@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Photo Metadata Fixer</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/piexifjs/1.0.6/piexif.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+:root{
+  --bg:#0d1117;
+  --panel:#12171f;
+  --panel-2:#161c26;
+  --border:#262f3a;
+  --text:#e6edf3;
+  --muted:#8b95a1;
+  --amber:#d9a441;
+  --amber-dim:#8a6a2c;
+  --ok:#3fb950;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:'IBM Plex Mono',monospace;
+  min-height:100vh;
+  padding:28px 16px 60px;
+}
+.wrap{max-width:640px;margin:0 auto;}
+.masthead{
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+  border-bottom:1px solid var(--border);
+  padding-bottom:14px;
+  margin-bottom:22px;
+}
+.masthead h1{
+  font-family:'Space Grotesk',sans-serif;
+  font-size:19px;
+  font-weight:700;
+  letter-spacing:0.02em;
+  margin:0;
+}
+.masthead h1 span{color:var(--amber);}
+.masthead .tag{font-size:10.5px;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;}
+
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:18px;margin-bottom:16px;}
+
+.dropzone-group{display:flex;flex-direction:column;gap:10px;}
+.dropzone{border:1.5px dashed var(--border);border-radius:4px;padding:24px 20px;text-align:center;cursor:pointer;transition:border-color .15s ease,background .15s ease;}
+.dropzone:hover{border-color:var(--amber-dim);background:var(--panel-2);}
+.dropzone .icon{width:32px;height:32px;margin:0 auto 10px;border:1.5px solid var(--muted);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--muted);}
+.dropzone .primary{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px;margin-bottom:3px;}
+.dropzone .secondary{font-size:11px;color:var(--muted);}
+.dz-divider{text-align:center;font-size:10px;letter-spacing:0.1em;color:var(--muted);position:relative;margin:2px 0;}
+input[type="file"]{display:none;}
+
+.stage{display:none;}
+.stage.active{display:block;}
+
+.preview-frame{border:1px solid var(--border);border-radius:4px;overflow:hidden;background:#000;margin-bottom:14px;max-height:300px;display:flex;align-items:center;justify-content:center;}
+.preview-frame img{width:100%;max-height:300px;object-fit:contain;display:block;}
+
+.section-label{
+  font-size:10px;letter-spacing:0.09em;text-transform:uppercase;color:var(--amber);
+  margin:18px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border);
+}
+.section-label:first-child{margin-top:0;}
+
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;}
+.field-row.single{grid-template-columns:1fr;}
+.field{display:flex;flex-direction:column;gap:6px;}
+.field label{font-size:10px;letter-spacing:0.09em;text-transform:uppercase;color:var(--muted);}
+.field input{
+  background:var(--panel-2);border:1px solid var(--border);border-radius:3px;color:var(--text);
+  font-family:'IBM Plex Mono',monospace;font-size:12.5px;padding:9px 10px;outline:none;
+}
+.field input:focus{border-color:var(--amber-dim);}
+.field input.readout{color:var(--muted);background:transparent;border-style:dashed;}
+.field input.primary-input{border-color:var(--amber-dim);}
+
+.actions{display:flex;gap:10px;margin-top:6px;}
+button{
+  font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:13px;border-radius:3px;
+  padding:11px 16px;border:1px solid var(--border);background:var(--panel-2);color:var(--text);
+  cursor:pointer;transition:filter .15s ease;flex:1;
+}
+button:hover{filter:brightness(1.12);}
+button.primary{background:var(--amber);border-color:var(--amber);color:#1a1305;}
+button.ghost{flex:none;padding:11px 14px;}
+button.small-ghost{font-size:11.5px;padding:8px 12px;flex:none;}
+
+.note{font-size:10.5px;color:var(--muted);line-height:1.5;margin-top:12px;}
+
+.badge-row{display:flex;align-items:center;gap:8px;font-size:10px;color:var(--muted);letter-spacing:0.05em;text-transform:uppercase;margin-bottom:14px;}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--amber);flex:none;}
+.dot.ok{background:var(--ok);}
+
+.result-panel{display:none;}
+.result-panel.active{display:block;}
+.meta-readout{border:1px solid var(--border);border-radius:3px;background:var(--panel-2);padding:10px 12px;font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:16px;}
+.meta-readout strong{color:var(--text);font-weight:600;}
+
+.geo-row{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+.geo-status{font-size:10.5px;color:var(--muted);flex:1;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="masthead">
+    <h1>PHOTO<span>·</span>METADATA FIXER</h1>
+    <div class="tag">realme 9 Pro+</div>
+  </div>
+
+  <!-- STAGE 1: capture -->
+  <div class="panel stage active" id="stage1">
+    <div class="dropzone-group">
+      <div class="dropzone" id="dzCamera">
+        <div class="icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M4 8a2 2 0 0 1 2-2h1.5l1-1.5h7l1 1.5H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8z"/>
+            <circle cx="12" cy="12.5" r="3.2"/>
+          </svg>
+        </div>
+        <div class="primary">Take a photo</div>
+        <div class="secondary">Opens your camera</div>
+      </div>
+      <div class="dz-divider">OR</div>
+      <div class="dropzone" id="dzGallery">
+        <div class="icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <rect x="3.5" y="4.5" width="17" height="15" rx="1.5"/>
+            <circle cx="8.5" cy="9.5" r="1.5"/>
+            <path d="M20.5 15.5 15.5 10.5 6.5 19.5"/>
+          </svg>
+        </div>
+        <div class="primary">Choose from gallery</div>
+        <div class="secondary">Pick an existing photo</div>
+      </div>
+    </div>
+    <input type="file" id="fileInputCamera" accept="image/*" capture="environment">
+    <input type="file" id="fileInputGallery" accept="image/*">
+    <div class="note">This restores metadata on your own photos taken on your realme 9 Pro+ — the lens/camera fields are fixed to your phone's known profile, so you mostly just need to fill in Name, Subject, Time and Location per photo. Nothing is uploaded; everything runs in your browser. HEIC originals are re-saved as JPEG, since EXIF only survives reliably in JPEG.</div>
+  </div>
+
+  <!-- STAGE 2: edit -->
+  <div class="panel stage" id="stage2">
+    <div class="badge-row"><div class="dot" id="statusDot"></div><span id="statusText">LOADED</span></div>
+    <div class="preview-frame"><img id="previewImg" alt="photo preview"></div>
+
+    <div class="section-label">Per-photo (fill in for this photo)</div>
+    <div class="field-row">
+      <div class="field">
+        <label for="fDate">Date</label>
+        <input type="date" id="fDate" class="primary-input">
+      </div>
+      <div class="field">
+        <label for="fTime">Time</label>
+        <input type="time" id="fTime" step="1" class="primary-input">
+      </div>
+    </div>
+    <div class="field-row single">
+      <div class="field">
+        <label for="fName">Name</label>
+        <input type="text" id="fName" class="primary-input" placeholder="20260721_040614PMGPSMapCamera">
+      </div>
+    </div>
+    <div class="field-row single">
+      <div class="field">
+        <label for="fSubject">Subject</label>
+        <input type="text" id="fSubject" class="primary-input" placeholder="e.g. Site inspection, north field">
+      </div>
+    </div>
+
+    <div class="section-label">Location (optional)</div>
+    <div class="geo-row">
+      <button type="button" class="small-ghost" id="btnGeo">Use current location</button>
+      <div class="geo-status" id="geoStatus">Not set</div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="fLat">Latitude</label>
+        <input type="text" id="fLat" class="primary-input" placeholder="28.613900">
+      </div>
+      <div class="field">
+        <label for="fLon">Longitude</label>
+        <input type="text" id="fLon" class="primary-input" placeholder="77.209000">
+      </div>
+    </div>
+
+    <div class="section-label">Device profile (fixed to your phone — edit only if needed)</div>
+    <div class="field-row">
+      <div class="field">
+        <label for="fDevice">Device</label>
+        <input type="text" id="fDevice">
+      </div>
+      <div class="field">
+        <label for="fFocal">Focal length</label>
+        <input type="text" id="fFocal">
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="fAperture">Aperture</label>
+        <input type="text" id="fAperture">
+      </div>
+      <div class="field">
+        <label for="fISO">ISO</label>
+        <input type="text" id="fISO">
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="fExposure">Exposure time</label>
+        <input type="text" id="fExposure">
+      </div>
+      <div class="field">
+        <label for="fFlash">Flash</label>
+        <input type="text" id="fFlash">
+      </div>
+    </div>
+    <div class="field-row single">
+      <div class="field">
+        <label for="fWB">White balance</label>
+        <input type="text" id="fWB">
+      </div>
+    </div>
+
+    <div class="section-label">Read directly from the file (not editable)</div>
+    <div class="field-row">
+      <div class="field">
+        <label>Dimensions</label>
+        <input type="text" id="fDims" class="readout" readonly>
+      </div>
+      <div class="field">
+        <label>Path (for reference only — not written into the file)</label>
+        <input type="text" id="fPath" class="readout" readonly>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="ghost" id="btnReset">New photo</button>
+      <button class="primary" id="btnSave">Save with fixed metadata</button>
+    </div>
+  </div>
+
+  <!-- STAGE 3: result -->
+  <div class="panel stage result-panel" id="stage3">
+    <div class="badge-row"><div class="dot ok"></div>METADATA WRITTEN — READ BACK FROM SAVED FILE</div>
+    <div class="meta-readout" id="resultMeta">—</div>
+    <div class="actions">
+      <button class="ghost" id="btnAgain">Fix another photo</button>
+      <button class="primary" id="btnDownload">Download file</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const DEVICE_PROFILE = {
+  make: 'realme',
+  model: 'RMX3392 :: Captured by - GPS Map Camera',
+  focalDisplay: '24 mm (full-frame equivalent)',
+  focal35mm: 24,
+  apertureDisplay: 'f1.8',
+  apertureRational: [18,10],
+  isoDisplay: '640',
+  iso: 640,
+  exposureDisplay: '1/50 s',
+  exposureRational: [1,50],
+  flashDisplay: 'No flash',
+  flashCode: 0,
+  wbDisplay: 'Auto',
+  wbCode: 0
+};
+
+const dzCamera = document.getElementById('dzCamera');
+const dzGallery = document.getElementById('dzGallery');
+const fileInputCamera = document.getElementById('fileInputCamera');
+const fileInputGallery = document.getElementById('fileInputGallery');
+const stage1 = document.getElementById('stage1');
+const stage2 = document.getElementById('stage2');
+const stage3 = document.getElementById('stage3');
+const previewImg = document.getElementById('previewImg');
+const statusDot = document.getElementById('statusDot');
+const statusText = document.getElementById('statusText');
+const resultMeta = document.getElementById('resultMeta');
+
+const fDate = document.getElementById('fDate');
+const fTime = document.getElementById('fTime');
+const fName = document.getElementById('fName');
+const fSubject = document.getElementById('fSubject');
+const fLat = document.getElementById('fLat');
+const fLon = document.getElementById('fLon');
+const geoStatus = document.getElementById('geoStatus');
+const btnGeo = document.getElementById('btnGeo');
+const fDevice = document.getElementById('fDevice');
+const fFocal = document.getElementById('fFocal');
+const fAperture = document.getElementById('fAperture');
+const fISO = document.getElementById('fISO');
+const fExposure = document.getElementById('fExposure');
+const fFlash = document.getElementById('fFlash');
+const fWB = document.getElementById('fWB');
+const fDims = document.getElementById('fDims');
+const fPath = document.getElementById('fPath');
+const btnReset = document.getElementById('btnReset');
+const btnSave = document.getElementById('btnSave');
+const btnAgain = document.getElementById('btnAgain');
+const btnDownload = document.getElementById('btnDownload');
+
+let jpegDataUrl = null;
+let finalDataUrl = null;
+let realWidth = 0, realHeight = 0;
+let nameManuallyEdited = false;
+
+function pad(n){ return n.toString().padStart(2,'0'); }
+function isoDate(d){ return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+function isoTime(d){ return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; }
+
+// --- UTF-16LE helpers for Windows "XP" EXIF tags (e.g. XPSubject) ---
+function strToUTF16LEBytes(str){
+  const bytes = [];
+  for(let i = 0; i < str.length; i++){
+    const code = str.charCodeAt(i);
+    bytes.push(code & 0xff, (code >> 8) & 0xff);
+  }
+  bytes.push(0, 0); // null terminator
+  return bytes;
+}
+function utf16LEBytesToStr(bytes){
+  let str = '';
+  for(let i = 0; i < bytes.length - 1; i += 2){
+    const code = bytes[i] | (bytes[i+1] << 8);
+    if(code === 0) break;
+    str += String.fromCharCode(code);
+  }
+  return str;
+}
+
+function androidName(){
+  if(!fDate.value) return '';
+  const [y,m,day] = fDate.value.split('-');
+  const t = (fTime.value || '00:00:00').split(':');
+  let h = parseInt(t[0] || '0', 10);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12;
+  if(h === 0) h = 12;
+  return `${y}${m}${day}_${pad(h)}${pad(t[1]||'00')}${pad(t[2]||'00')}${ampm}GPSMapCamera`;
+}
+
+function exifDateString(){
+  if(!fDate.value) return null;
+  const [y,m,day] = fDate.value.split('-');
+  const t = (fTime.value || '00:00:00').split(':');
+  return `${y}:${m}:${day} ${pad(t[0]||'00')}:${pad(t[1]||'00')}:${pad(t[2]||'00')}`;
+}
+
+function displayDate(exifStr){
+  if(!exifStr) return null;
+  const [datePart, timePart] = exifStr.split(' ');
+  const [y,m,d] = datePart.split(':');
+  return `${d}/${m}/${y} ${timePart || ''}`.trim();
+}
+
+function syncNameFromTime(){
+  if(!nameManuallyEdited) fName.value = androidName();
+}
+
+fDate.addEventListener('input', syncNameFromTime);
+fTime.addEventListener('input', syncNameFromTime);
+fName.addEventListener('input', () => { nameManuallyEdited = true; });
+
+dzCamera.addEventListener('click', () => fileInputCamera.click());
+dzGallery.addEventListener('click', () => fileInputGallery.click());
+fileInputCamera.addEventListener('change', onFile);
+fileInputGallery.addEventListener('change', onFile);
+
+function onFile(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  const isJpeg = /jpe?g$/i.test(file.type) || /jpe?g$/i.test(file.name);
+  const reader = new FileReader();
+
+  reader.onload = () => {
+    if(isJpeg){
+      jpegDataUrl = reader.result;
+      loadDims(jpegDataUrl, () => afterLoad(file));
+    } else {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        canvas.getContext('2d').drawImage(img, 0, 0);
+        jpegDataUrl = canvas.toDataURL('image/jpeg', 0.95);
+        realWidth = img.naturalWidth;
+        realHeight = img.naturalHeight;
+        afterLoad(file);
+      };
+      img.src = reader.result;
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+function loadDims(dataUrl, cb){
+  const img = new Image();
+  img.onload = () => { realWidth = img.naturalWidth; realHeight = img.naturalHeight; cb(); };
+  img.src = dataUrl;
+}
+
+function afterLoad(file){
+  nameManuallyEdited = false;
+  stage1.classList.remove('active');
+  stage2.classList.add('active');
+  previewImg.src = jpegDataUrl;
+  statusText.textContent = 'READY TO FIX';
+
+  const capturedAt = file.lastModified ? new Date(file.lastModified) : new Date();
+  fDate.value = isoDate(capturedAt);
+  fTime.value = isoTime(capturedAt);
+  fName.value = androidName();
+  fSubject.value = '';
+
+  fLat.value = '';
+  fLon.value = '';
+  geoStatus.textContent = 'Not set';
+
+  fDevice.value = DEVICE_PROFILE.model;
+  fFocal.value = DEVICE_PROFILE.focalDisplay;
+  fAperture.value = DEVICE_PROFILE.apertureDisplay;
+  fISO.value = DEVICE_PROFILE.isoDisplay;
+  fExposure.value = DEVICE_PROFILE.exposureDisplay;
+  fFlash.value = DEVICE_PROFILE.flashDisplay;
+  fWB.value = DEVICE_PROFILE.wbDisplay;
+
+  fDims.value = `${realWidth} × ${realHeight} Pixels`;
+  updatePath();
+}
+
+function updatePath(){
+  fPath.value = `Phone/DCIM/GPS Map Camera/Default/${fName.value || androidName()}.jpg`;
+}
+fName.addEventListener('input', updatePath);
+fDate.addEventListener('input', updatePath);
+fTime.addEventListener('input', updatePath);
+
+btnReset.addEventListener('click', resetToStage1);
+btnAgain.addEventListener('click', resetToStage1);
+
+function resetToStage1(){
+  jpegDataUrl = null;
+  finalDataUrl = null;
+  fileInputCamera.value = '';
+  fileInputGallery.value = '';
+  stage1.classList.add('active');
+  stage2.classList.remove('active');
+  stage3.classList.remove('active');
+}
+
+btnGeo.addEventListener('click', () => {
+  if(!navigator.geolocation){
+    geoStatus.textContent = 'Geolocation not supported on this device';
+    return;
+  }
+  geoStatus.textContent = 'Locating…';
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      fLat.value = pos.coords.latitude.toFixed(6);
+      fLon.value = pos.coords.longitude.toFixed(6);
+      geoStatus.textContent = 'Location set from device';
+    },
+    err => {
+      geoStatus.textContent = 'Could not get location — enter manually';
+    },
+    { enableHighAccuracy: true, timeout: 8000 }
+  );
+});
+
+function parseAperture(v){
+  const m = /([\d.]+)/.exec(v || '');
+  if(!m) return DEVICE_PROFILE.apertureRational;
+  const f = parseFloat(m[1]);
+  return [Math.round(f*10), 10];
+}
+function parseExposure(v){
+  const m = /(\d+)\s*\/\s*(\d+)/.exec(v || '');
+  if(m) return [parseInt(m[1]), parseInt(m[2])];
+  const f = parseFloat(v);
+  if(!isNaN(f) && f > 0) return [1, Math.round(1/f)];
+  return DEVICE_PROFILE.exposureRational;
+}
+function parseFocal(v){
+  const m = /([\d.]+)/.exec(v || '');
+  return m ? Math.round(parseFloat(m[1])) : DEVICE_PROFILE.focal35mm;
+}
+function parseISO(v){
+  const n = parseInt(v);
+  return isNaN(n) ? DEVICE_PROFILE.iso : n;
+}
+function parseFlash(v){
+  return /no\s*flash/i.test(v || '') ? 0 : 1;
+}
+function parseWB(v){
+  return /manual/i.test(v || '') ? 1 : 0;
+}
+
+function decToDMSRational(deg){
+  const absDeg = Math.abs(deg);
+  const d = Math.floor(absDeg);
+  const minFloat = (absDeg - d) * 60;
+  const m = Math.floor(minFloat);
+  const secFloat = (minFloat - m) * 60;
+  const secNum = Math.round(secFloat * 100);
+  return [[d,1],[m,1],[secNum,100]];
+}
+
+function dmsToDecimal(dms, ref){
+  if(!dms) return null;
+  const d = dms[0][1] ? dms[0][0]/dms[0][1] : 0;
+  const m = dms[1][1] ? dms[1][0]/dms[1][1] : 0;
+  const s = dms[2][1] ? dms[2][0]/dms[2][1] : 0;
+  let dec = d + m/60 + s/3600;
+  if(ref === 'S' || ref === 'W') dec = -dec;
+  return dec;
+}
+
+function buildGPSIFD(lat, lon){
+  if(lat === null || lon === null || isNaN(lat) || isNaN(lon)) return null;
+  const gps = {};
+  gps[piexif.GPSIFD.GPSVersionID] = [2,3,0,0];
+  gps[piexif.GPSIFD.GPSLatitudeRef] = lat >= 0 ? 'N' : 'S';
+  gps[piexif.GPSIFD.GPSLatitude] = decToDMSRational(lat);
+  gps[piexif.GPSIFD.GPSLongitudeRef] = lon >= 0 ? 'E' : 'W';
+  gps[piexif.GPSIFD.GPSLongitude] = decToDMSRational(lon);
+  return gps;
+}
+
+btnSave.addEventListener('click', () => {
+  if(!jpegDataUrl) return;
+
+  const dt = exifDateString();
+  const zeroth = {};
+  const exifIFD = {};
+
+  zeroth[piexif.ImageIFD.Make] = DEVICE_PROFILE.make;
+  zeroth[piexif.ImageIFD.Model] = fDevice.value || DEVICE_PROFILE.model;
+
+  const subjectText = fSubject.value.trim();
+  if(subjectText){
+    // XPSubject: what Windows/most desktop viewers show as "Subject" in file details
+    zeroth[piexif.ImageIFD.XPSubject] = strToUTF16LEBytes(subjectText);
+    // ImageDescription: fallback read by tools/viewers that don't support XP tags
+    zeroth[piexif.ImageIFD.ImageDescription] = subjectText;
+  }
+
+  if(dt){
+    zeroth[piexif.ImageIFD.DateTime] = dt;
+    exifIFD[piexif.ExifIFD.DateTimeOriginal] = dt;
+    exifIFD[piexif.ExifIFD.DateTimeDigitized] = dt;
+  }
+
+  exifIFD[piexif.ExifIFD.FNumber] = parseAperture(fAperture.value);
+  exifIFD[piexif.ExifIFD.FocalLengthIn35mmFilm] = parseFocal(fFocal.value);
+  exifIFD[piexif.ExifIFD.ISOSpeedRatings] = parseISO(fISO.value);
+  exifIFD[piexif.ExifIFD.ExposureTime] = parseExposure(fExposure.value);
+  exifIFD[piexif.ExifIFD.Flash] = parseFlash(fFlash.value);
+  exifIFD[piexif.ExifIFD.WhiteBalance] = parseWB(fWB.value);
+  exifIFD[piexif.ExifIFD.PixelXDimension] = realWidth;
+  exifIFD[piexif.ExifIFD.PixelYDimension] = realHeight;
+
+  const exifObj = { '0th': zeroth, 'Exif': exifIFD };
+
+  const latVal = fLat.value.trim() === '' ? null : parseFloat(fLat.value);
+  const lonVal = fLon.value.trim() === '' ? null : parseFloat(fLon.value);
+  const gpsIFD = buildGPSIFD(latVal, lonVal);
+  if(gpsIFD) exifObj['GPS'] = gpsIFD;
+
+  let exifBytes;
+  try{
+    exifBytes = piexif.dump(exifObj);
+    finalDataUrl = piexif.insert(exifBytes, jpegDataUrl);
+  }catch(err){
+    alert('Could not write metadata: ' + err.message);
+    return;
+  }
+
+  const verify = piexif.load(finalDataUrl);
+
+  let gpsLine = '';
+  if(verify['GPS'] && verify['GPS'][piexif.GPSIFD.GPSLatitude]){
+    const latDec = dmsToDecimal(verify['GPS'][piexif.GPSIFD.GPSLatitude], verify['GPS'][piexif.GPSIFD.GPSLatitudeRef]);
+    const lonDec = dmsToDecimal(verify['GPS'][piexif.GPSIFD.GPSLongitude], verify['GPS'][piexif.GPSIFD.GPSLongitudeRef]);
+    gpsLine = `Location: <strong>${latDec.toFixed(6)}, ${lonDec.toFixed(6)}</strong><br>`;
+  }
+
+  let subjectLine = '';
+  const savedSubjectBytes = verify['0th'][piexif.ImageIFD.XPSubject];
+  if(savedSubjectBytes){
+    const savedSubject = utf16LEBytesToStr(savedSubjectBytes);
+    if(savedSubject) subjectLine = `Subject: <strong>${savedSubject}</strong><br>`;
+  }
+
+  resultMeta.innerHTML =
+    `Name: <strong>${fName.value}</strong><br>` +
+    `Time: <strong>${displayDate(verify['Exif'][piexif.ExifIFD.DateTimeOriginal])}</strong><br>` +
+    gpsLine +
+    `Device: <strong>${verify['0th'][piexif.ImageIFD.Model]}</strong><br>` +
+    subjectLine +
+    `Dimensions: <strong>${realWidth} × ${realHeight} Pixels</strong><br>` +
+    `Focal length: <strong>${fFocal.value}</strong><br>` +
+    `Aperture: <strong>${fAperture.value}</strong><br>` +
+    `ISO: <strong>${fISO.value}</strong><br>` +
+    `Exposure time: <strong>${fExposure.value}</strong><br>` +
+    `Flash: <strong>${fFlash.value}</strong><br>` +
+    `White balance: <strong>${fWB.value}</strong>`;
+
+  stage2.classList.remove('active');
+  stage3.classList.add('active');
+});
+
+btnDownload.addEventListener('click', () => {
+  if(!finalDataUrl) return;
+  const link = document.createElement('a');
+  link.download = `${fName.value || 'IMG'}.jpg`;
+  link.href = finalDataUrl;
+  link.click();
+});
+</script>
+</body>
+</html>
