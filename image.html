@@ -166,7 +166,7 @@ button.small-ghost{font-size:11.5px;padding:8px 12px;flex:none;}
     <div class="field-row single">
       <div class="field">
         <label for="fName">Name</label>
-        <input type="text" id="fName" class="primary-input" placeholder="20260721_040614PMGPSMapCamera">
+        <input type="text" id="fName" class="primary-input" placeholder="IMG20260721161411">
       </div>
     </div>
 
@@ -225,17 +225,17 @@ button.small-ghost{font-size:11.5px;padding:8px 12px;flex:none;}
     </div>
 
     <div class="section-label">Read directly from the file (not editable)</div>
-    <div class="field-row">
+    <div class="field-row single">
       <div class="field">
         <label for="fSubject">Subject</label>
-        <input type="text" id="fSubject" class="primary-input" placeholder="Enter subject">
+        <input type="text" id="fSubject" class="primary-input" value="Imaging" placeholder="Imaging">
       </div>
+    </div>
+    <div class="field-row">
       <div class="field">
         <label>Dimensions</label>
         <input type="text" id="fDims" class="readout" readonly>
       </div>
-    </div>
-    <div class="field-row single">
       <div class="field">
         <label>Path (for reference only — not written into the file)</label>
         <input type="text" id="fPath" class="readout" readonly>
@@ -325,11 +325,7 @@ function androidName(){
   if(!fDate.value) return '';
   const [y,m,day] = fDate.value.split('-');
   const t = (fTime.value || '00:00:00').split(':');
-  let h = parseInt(t[0] || '0', 10);
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  h = h % 12;
-  if(h === 0) h = 12;
-  return `${y}${m}${day}_${pad(h)}${pad(t[1]||'00')}${pad(t[2]||'00')}${ampm}GPSMapCamera`;
+  return `IMG${y}${m}${day}${pad(t[0]||'00')}${pad(t[1]||'00')}${pad(t[2]||'00')}`;
 }
 
 function exifDateString(){
@@ -416,7 +412,6 @@ function afterLoad(file){
   fExposure.value = DEVICE_PROFILE.exposureDisplay;
   fFlash.value = DEVICE_PROFILE.flashDisplay;
   fWB.value = DEVICE_PROFILE.wbDisplay;
-  fSubject.value = '';
 
   fDims.value = `${realWidth} × ${realHeight} Pixels`;
   updatePath();
@@ -542,26 +537,14 @@ btnSave.addEventListener('click', () => {
   exifIFD[piexif.ExifIFD.ExposureTime] = parseExposure(fExposure.value);
   exifIFD[piexif.ExifIFD.Flash] = parseFlash(fFlash.value);
   exifIFD[piexif.ExifIFD.WhiteBalance] = parseWB(fWB.value);
+  const subjectValue = fSubject.value.trim() || 'Imaging';
+  zeroth[piexif.ImageIFD.ImageDescription] = subjectValue;
+  // Windows Explorer commonly reads XPSubject for the Subject property.
+  zeroth[piexif.ImageIFD.XPSubject] = Array.from(subjectValue)
+    .map(c => c.charCodeAt(0))
+    .concat([0]);
   exifIFD[piexif.ExifIFD.PixelXDimension] = realWidth;
   exifIFD[piexif.ExifIFD.PixelYDimension] = realHeight;
-
-  // Store Subject in multiple EXIF-compatible fields so metadata viewers
-  // (including Windows File Explorer) can detect/display it.
-  const subject = fSubject.value.trim();
-
-  // Standard EXIF ImageDescription.
-  zeroth[piexif.ImageIFD.ImageDescription] = subject;
-
-  // Windows-compatible EXIF XPSubject (UTF-16LE, null terminated).
-  // This is the field commonly exposed as "Subject" in Windows image properties.
-  if (piexif.ImageIFD.XPSubject !== undefined) {
-    const xpBytes = [];
-    for (let i = 0; i < (subject + '\\0').length; i++) {
-      const code = (subject + '\\0').charCodeAt(i);
-      xpBytes.push(code & 0xff, (code >> 8) & 0xff);
-    }
-    zeroth[piexif.ImageIFD.XPSubject] = xpBytes;
-  }
 
   const exifObj = { '0th': zeroth, 'Exif': exifIFD };
 
@@ -588,24 +571,12 @@ btnSave.addEventListener('click', () => {
     gpsLine = `Location: <strong>${latDec.toFixed(6)}, ${lonDec.toFixed(6)}</strong><br>`;
   }
 
-  let savedSubject = verify['0th'][piexif.ImageIFD.ImageDescription] || '';
-  if (verify['0th'][piexif.ImageIFD.XPSubject]) {
-    const bytes = verify['0th'][piexif.ImageIFD.XPSubject];
-    let decoded = '';
-    for (let i = 0; i + 1 < bytes.length; i += 2) {
-      const code = bytes[i] | (bytes[i + 1] << 8);
-      if (code === 0) break;
-      decoded += String.fromCharCode(code);
-    }
-    if (decoded) savedSubject = decoded;
-  }
-
   resultMeta.innerHTML =
     `Name: <strong>${fName.value}</strong><br>` +
     `Time: <strong>${displayDate(verify['Exif'][piexif.ExifIFD.DateTimeOriginal])}</strong><br>` +
     gpsLine +
     `Device: <strong>${verify['0th'][piexif.ImageIFD.Model]}</strong><br>` +
-    `Subject: <strong>${savedSubject}</strong><br>` +
+    `Subject: <strong>${verify['0th'][piexif.ImageIFD.ImageDescription] || fSubject.value}</strong><br>` +
     `Dimensions: <strong>${realWidth} × ${realHeight} Pixels</strong><br>` +
     `Focal length: <strong>${fFocal.value}</strong><br>` +
     `Aperture: <strong>${fAperture.value}</strong><br>` +
